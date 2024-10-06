@@ -1,4 +1,5 @@
 mod db_connect;
+mod error;
 mod models;
 
 use std::net::SocketAddr;
