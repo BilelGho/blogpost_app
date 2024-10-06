@@ -1,10 +1,12 @@
 mod db_connect;
 mod error;
+mod image_service;
 mod models;
 
 use std::net::SocketAddr;
 
 use axum::{http::StatusCode, response::IntoResponse, routing::get, Router};
+use image_service::get_image;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use tower_http::trace::TraceLayer;
 
@@ -31,6 +33,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/", get(root))
+        .route("/images/:uuid", get(get_image))
         .layer(TraceLayer::new_for_http());
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
