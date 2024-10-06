@@ -2,6 +2,7 @@ mod db_connect;
 mod error;
 mod image_service;
 mod models;
+mod controllers;
 
 use std::net::SocketAddr;
 
@@ -34,6 +35,7 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/", get(root))
         .route("/images/:uuid", get(get_image))
+        .route("/blogposts", get(controllers::blogpost::get_all))
         .layer(TraceLayer::new_for_http());
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
