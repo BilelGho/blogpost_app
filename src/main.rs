@@ -6,7 +6,7 @@ mod controllers;
 
 use std::net::SocketAddr;
 
-use axum::{http::StatusCode, response::IntoResponse, routing::{get, post}, Extension, Router};
+use axum::{response::{Html, IntoResponse}, routing::{get, post}, Extension, Router};
 use image_service::get_image;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use tower_http::trace::TraceLayer;
@@ -34,7 +34,7 @@ async fn main() -> anyhow::Result<()> {
 
 
     let app = Router::new()
-        .route("/", get(root))
+        .route("/home", get(get_home))
         .route("/images/:uuid", get(get_image))
         .route("/blogposts", get(controllers::blogpost::get_all))
         .route("/blogposts", post(controllers::blogpost::process_create_blogpost_request))
@@ -53,6 +53,6 @@ async fn main() -> anyhow::Result<()> {
 
 }
 
-async fn root() -> impl IntoResponse {
-    (StatusCode::OK,"Hello, World!")
+async fn get_home() -> impl IntoResponse {
+    Html(include_str!("views/home_view.html"))
 }

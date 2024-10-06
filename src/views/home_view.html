@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blog Posts</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .post {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .form-container {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Blog Posts</h1>
+    <div id="posts">
+        <!-- Blog posts will be dynamically inserted here -->
+    </div>
+
+    <div class="form-container">
+        <h2>Add a New Post</h2>
+        <form id="new-post-form">
+            <label for="username">Username:</label><br>
+            <input type="text" id="username" name="username" required><br><br>
+            <label for="profile-url">Profile Image URL:</label><br>
+            <input type="url" id="profile-url" name="profile-url"><br><br>
+            <label for="content">Content:</label><br>
+            <textarea id="content" name="content" rows="4" required></textarea><br><br>
+            <label for="image">Image:</label><br>
+            <input type="file" id="image" name="image" accept=".png"><br><br>
+            <button type="submit">Add Post</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('new-post-form').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const username = document.getElementById('username').value;
+            const content = document.getElementById('content').value;
+            const profileUrl = document.getElementById('profile-url').value;
+            const image = document.getElementById('image').files[0];
+            const toBase64 = image => new Promise((resolve,reject) => {if (image) {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',').pop());
+                reader.onerror = reject;
+                reader.readAsDataURL(image);
+            } else {
+                resolve(null);
+            }
+        });
+            const imageBytes = await toBase64(image);
+
+
+            
+
+            await fetch('http://localhost:8000/blogposts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username: username, content: content, user_image_url: profileUrl? profileUrl : null, post_image: imageBytes }),
+            });
+            getPosts();
+            document.getElementById('new-post-form').reset();
+        });
+
+        function getPosts() {
+            fetch('http://localhost:8000/blogposts')
+                .then(response => response.json())
+                .then(data => {
+                    const posts = data.map(post => `
+                        <div class="post">
+                            ${post.user_image_uuid? `<img src="images/${post.user_image_uuid}" alt="Profile Image" style="width: 50px; height: 50px;">` : ''}
+                            <h3> By: ${post.username}  at ${post.created_at} </h3>
+                            <p>${post.content}</p>
+                            ${post.post_image_uuid? `<img src="images/${post.post_image_uuid}" alt="Post Image">` : ''}
+                        </div>
+                    `);
+                    document.getElementById('posts').innerHTML = posts.join('');
+                });
+        }
+
+        getPosts();
+    </script>
+</body>
+</html>
