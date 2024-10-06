@@ -1,7 +1,11 @@
 use axum::{Extension, Json};
+use base64::prelude::BASE64_STANDARD;
+use base64::Engine;
+use futures::future::OptionFuture;
 use reqwest::StatusCode;
 
-use crate::{error::CustomError};
+use crate::image_service::{drop_image, persist_image_from_url, store_image_in_filesystem};
+use crate::error::CustomError;
 use crate::models::blogpost::{Blogpost, BlogpostRequest};
 
 pub async fn get_all(Extension(pool): Extension<sqlx::SqlitePool>) -> Result<(StatusCode,Json<Vec<Blogpost>>), CustomError> {
@@ -18,7 +22,7 @@ pub async fn get_all(Extension(pool): Extension<sqlx::SqlitePool>) -> Result<(St
 pub async fn create_new_blogpost(
     payload: Blogpost,
     Extension(pool): Extension<sqlx::SqlitePool>,
-) -> Blogpost {
+) -> Result<Blogpost, CustomError> {
     let sql = "INSERT INTO BLOGPOST (content, username, created_at, user_image_uuid, post_image_uuid) VALUES (?, ?, ?, ?, ?)";
     sqlx::query(sql)
         .bind(&payload.content)
@@ -28,9 +32,9 @@ pub async fn create_new_blogpost(
         .bind(&payload.post_image_uuid)
         .execute(&pool)
         .await
-        .unwrap();
+        .map_err(|_| CustomError::InternalServerError)?;
 
-   payload
+   Ok(payload)
 }
 
 pub async fn process_create_blogpost_request(pool: Extension<sqlx::SqlitePool>, Json(payload): Json<BlogpostRequest>) -> Result<(StatusCode,Json<Blogpost>), CustomError> {
@@ -58,15 +62,17 @@ pub async fn process_create_blogpost_request(pool: Extension<sqlx::SqlitePool>, 
         post_image_uuid,
     };
 
-    let result = create_new_blogpost(blogpost, pool).await;
+    let result = create_new_blogpost(blogpost, pool).await?;
     Ok((StatusCode::CREATED,Json(result)))
 }
 
 #[cfg(test)]
 mod tests {
-    use axum::Extension;
+    use axum::{Extension, Json};
     use reqwest::StatusCode;
     use sqlx::SqlitePool;
+
+    use crate::models::blogpost::{Blogpost, BlogpostRequest};
     
     #[sqlx::test]
     async fn test_get_all_blogposts(pool: SqlitePool) {
@@ -74,4 +80,45 @@ mod tests {
         assert_eq!(response.0, StatusCode::OK);
         assert!(response.1 .0.is_empty());
     }
+
+    #[sqlx::test]
+    async fn test_create_new_blogpost(pool: SqlitePool) {
+        let content = "Test content";
+        let username = "Test user";
+
+        let blogpost = Blogpost {
+            id: 0,
+            content: content.to_string(),
+            username: username.to_string(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            user_image_uuid: None,
+            post_image_uuid: None,
+        };
+        let response = super::create_new_blogpost(blogpost, Extension(pool.clone())).await.unwrap();
+        assert_eq!(response.content, content);
+        assert_eq!(response.username, username);
+
+        let all_blogposts = sqlx::query_as::<_, Blogpost>("SELECT * FROM BLOGPOST")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        assert_eq!(all_blogposts.len(), 1);
+        assert_eq!(all_blogposts[0].content, content);
+    }
+
+    #[sqlx::test]
+    async fn test_process_create_blogpost_request(pool: SqlitePool) {
+        let payload = BlogpostRequest {
+            content: "Test content".to_string(),
+            username: "Test user".to_string(),
+            post_image: None,
+            user_image_url: None,
+        };
+        let (status_code, Json(blogpost)) = super::process_create_blogpost_request(Extension(pool), Json(payload)).await.unwrap();
+        assert_eq!(status_code, StatusCode::CREATED);
+        assert_eq!(blogpost.content, "Test content");
+    }
+
+
+    
 }

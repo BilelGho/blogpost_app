@@ -6,6 +6,9 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.89"
 axum = {version = "0.7.7", features =["macros"]}
+base64 = "0.22.1"
+chrono = "0.4.38"
+futures = "0.3.31"
 reqwest = "0.12.8"
 serde = "1.0.210"
 serde_json = "1.0.128"

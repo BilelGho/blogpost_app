@@ -6,7 +6,7 @@ mod controllers;
 
 use std::net::SocketAddr;
 
-use axum::{http::StatusCode, response::IntoResponse, routing::get, Router};
+use axum::{http::StatusCode, response::IntoResponse, routing::{get, post}, Extension, Router};
 use image_service::get_image;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use tower_http::trace::TraceLayer;
@@ -15,7 +15,8 @@ use tower_http::trace::TraceLayer;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
 
-
+    let pool = db_connect::db_connect().await;
+    
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
@@ -36,6 +37,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/", get(root))
         .route("/images/:uuid", get(get_image))
         .route("/blogposts", get(controllers::blogpost::get_all))
+        .route("/blogposts", post(controllers::blogpost::process_create_blogpost_request))
+        .layer(Extension(pool))
         .layer(TraceLayer::new_for_http());
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
