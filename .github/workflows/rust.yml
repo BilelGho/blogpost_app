@@ -1,0 +1,30 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: clean
+      run: cargo clean
+    - name: Build
+      run: cargo build --verbose
+    - name: set env
+      run: echo -n "DATABASE_URL=sqlite:/database.db" > .env 
+    - name: prepare test folder
+      run: mkdir images   
+    - name: Run tests
+      run: cargo test --verbose
+    - name: clean up
+      run: rm -rf images .env
