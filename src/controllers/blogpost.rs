@@ -38,7 +38,10 @@ pub async fn create_new_blogpost(
 }
 
 pub async fn process_create_blogpost_request(pool: Extension<sqlx::SqlitePool>, Json(payload): Json<BlogpostRequest>) -> Result<(StatusCode,Json<Blogpost>), CustomError> {
-    let post_image_uuid = payload
+    let mut post_image_uuid: Option<String> = None;
+    let mut user_image_uuid: Option<String> = None;
+    let result = { 
+    post_image_uuid = payload
         .post_image
         .as_ref()
         .map(|base64_encoded_file| {
@@ -46,7 +49,7 @@ pub async fn process_create_blogpost_request(pool: Extension<sqlx::SqlitePool>, 
         })
         .transpose()?;
 
-    let user_image_uuid = OptionFuture::from(payload
+    user_image_uuid = OptionFuture::from(payload
         .user_image_url
         .as_ref()
         .map(|url| persist_image_from_url(url)))
@@ -58,11 +61,21 @@ pub async fn process_create_blogpost_request(pool: Extension<sqlx::SqlitePool>, 
         content: payload.content,
         username: payload.username,
         created_at: chrono::Utc::now().to_rfc3339(),
-        user_image_uuid,
-        post_image_uuid,
+        user_image_uuid: user_image_uuid.clone(),
+        post_image_uuid: post_image_uuid.clone(),
     };
 
-    let result = create_new_blogpost(blogpost, pool).await?;
+    create_new_blogpost(blogpost, pool).await
+    }.map_err(|err| {
+        [post_image_uuid.clone(), user_image_uuid.clone()]
+            .iter()
+            .for_each(|uuid| {
+                if let Some(uuid) = uuid {
+                    let _ = drop_image(uuid);
+                }
+            });
+            err
+        })?;
     Ok((StatusCode::CREATED,Json(result)))
 }
 
